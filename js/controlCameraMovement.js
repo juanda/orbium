@@ -2,7 +2,13 @@ var container, stats;
 
 var camera, scene, renderer;
 
-var body1, body2, plane;
+var cube, plane;
+
+var targetRotation = 0;
+var targetRotationOnMouseDown = 0;
+
+var mouseX = 0;
+var mouseXOnMouseDown = 0;
 
 var windowHalfX = window.innerWidth / 2;
 var windowHalfY = window.innerHeight / 2;
@@ -13,7 +19,13 @@ var camera_gui_params = {
     position_y: 150,
     position_z: 500,
     near: 1,
-    far: 10000
+    far: 1000
+};
+
+var cube_gui_params = {
+    position_x: 0,
+    position_y: 150,
+    position_z: 0
 };
 
 init();
@@ -29,8 +41,7 @@ function init() {
     info.style.top = '10px';
     info.style.width = '100%';
     info.style.textAlign = 'center';
-    info.id = 'info';
-    info.innerHTML = 'Camera Velocity Test';
+    info.innerHTML = 'Drag to spin the cube';
     container.appendChild(info);
 
     camera = new THREE.PerspectiveCamera(camera_gui_params.fov, window.innerWidth / window.innerHeight, camera_gui_params.near, camera_gui_params.far);
@@ -40,17 +51,31 @@ function init() {
 
     scene = new THREE.Scene();
 
-    var geometry = new THREE.SphereGeometry(100,20,20);
-    
-    var material = new THREE.MeshBasicMaterial({color: 0xff0000});
-    
-    body1 = new THREE.Mesh(geometry, material);
-    
-    body2 = new THREE.Mesh(geometry, material);
-    body2.position.z = -10000; /* 100 metros */
-    
-    scene.add(body1);
-    scene.add(body2);
+    // Cube
+
+    var geometry = new THREE.CubeGeometry(200, 200, 200);
+
+    for (var i = 0; i < geometry.faces.length; i++) {
+
+        geometry.faces[ i ].color.setHex(Math.random() * 0xffffff);
+
+    }
+
+    var material = new THREE.MeshBasicMaterial({vertexColors: THREE.FaceColors});
+
+    cube = new THREE.Mesh(geometry, material);
+    cube.position.y = 150;
+    scene.add(cube);
+
+    // Plane
+
+    var geometry = new THREE.PlaneGeometry(2000, 2000);
+    geometry.applyMatrix(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+
+    var material = new THREE.MeshBasicMaterial({color: 0xe0e0e0});
+
+    plane = new THREE.Mesh(geometry, material);
+    scene.add(plane);
 
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -61,6 +86,10 @@ function init() {
     stats.domElement.style.position = 'absolute';
     stats.domElement.style.top = '0px';
     container.appendChild(stats.domElement);
+
+    document.addEventListener('mousedown', onDocumentMouseDown, false);
+    document.addEventListener('touchstart', onDocumentTouchStart, false);
+    document.addEventListener('touchmove', onDocumentTouchMove, false);
 
     document.addEventListener('keydown', onKeyDown, false);
     document.addEventListener('keyup', onKeyUp, false);
@@ -124,7 +153,6 @@ var keys = {
 
 var repeat = 10;
 
-var inicio, final, incremento;
 /**
  * Cuando presionamos una tecla, si dicha tecla esta registrada en el
  * array keys, entonces se asocia un timer a esa tecla de manera que
@@ -135,7 +163,7 @@ var inicio, final, incremento;
  * @returns {Boolean}
  */
 function onKeyDown(event) {
-    inicio = Date.now();
+   
     var key = (event || window.event).keyCode;
     if (!(key in keys))
         return true;
@@ -157,11 +185,6 @@ function onKeyDown(event) {
  * @returns {undefined}
  */
 function onKeyUp(event) {
-    final = Date.now();
-    
-    incremento = final-inicio;
-        
-    console.log(incremento + " s elapsed");
     var key = (event || window.event).keyCode;
     if (key in timers) {
         if (timers[key] !== null)
@@ -189,13 +212,77 @@ function onWindowResize() {
 
 }
 
+//
+
+function onDocumentMouseDown(event) {
+
+    event.preventDefault();
+
+    document.addEventListener('mousemove', onDocumentMouseMove, false);
+    document.addEventListener('mouseup', onDocumentMouseUp, false);
+    document.addEventListener('mouseout', onDocumentMouseOut, false);
+
+    mouseXOnMouseDown = event.clientX - windowHalfX;
+    targetRotationOnMouseDown = targetRotation;
+
+}
+
+function onDocumentMouseMove(event) {
+
+    mouseX = event.clientX - windowHalfX;
+
+    targetRotation = targetRotationOnMouseDown + (mouseX - mouseXOnMouseDown) * 0.02;
+
+}
+
+function onDocumentMouseUp(event) {
+
+    document.removeEventListener('mousemove', onDocumentMouseMove, false);
+    document.removeEventListener('mouseup', onDocumentMouseUp, false);
+    document.removeEventListener('mouseout', onDocumentMouseOut, false);
+
+}
+
+function onDocumentMouseOut(event) {
+
+    document.removeEventListener('mousemove', onDocumentMouseMove, false);
+    document.removeEventListener('mouseup', onDocumentMouseUp, false);
+    document.removeEventListener('mouseout', onDocumentMouseOut, false);
+
+}
+
+function onDocumentTouchStart(event) {
+
+    if (event.touches.length === 1) {
+
+        event.preventDefault();
+
+        mouseXOnMouseDown = event.touches[ 0 ].pageX - windowHalfX;
+        targetRotationOnMouseDown = targetRotation;
+
+    }
+
+}
+
+function onDocumentTouchMove(event) {
+
+    if (event.touches.length === 1) {
+
+        event.preventDefault();
+
+        mouseX = event.touches[ 0 ].pageX - windowHalfX;
+        targetRotation = targetRotationOnMouseDown + (mouseX - mouseXOnMouseDown) * 0.05;
+
+    }
+
+}
+
+//
 
 function animate() {
 
     requestAnimationFrame(animate);
-    
-    var info = document.getElementById('info');
-    info.innerHTML = 'Camera Velocity Test: ' + camera.position.x + ',' + camera.position.y + ',' +camera.position.z;
+
     render();
     stats.update();
 
@@ -203,6 +290,9 @@ function animate() {
 
 function render() {
 
+    plane.rotation.y = cube.rotation.y += (targetRotation - cube.rotation.y) * 0.05;
+    plane.position.x = cube.position.x;
+    plane.position.z = cube.position.z;
     renderer.render(scene, camera);
 
 }
