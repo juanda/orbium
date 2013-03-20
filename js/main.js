@@ -1,8 +1,12 @@
 var container, stats;
+//var btnPlay, btnStop, btnPause;
+var requestAnimationId;
+var balls = [];
+var worldStatus = "STOPPED";
+
 
 var camera, scene, renderer;
 
-var body1, body2, plane;
 
 var windowHalfX = window.innerWidth / 2;
 var windowHalfY = window.innerHeight / 2;
@@ -11,27 +15,24 @@ var camera_gui_params = {
     fov: 70,
     position_x: 0,
     position_y: 150,
-    position_z: 500,
+    position_z: 250,
     near: 1,
     far: 10000
 };
 
 init();
-animate();
+//animate();
 
 function init() {
 
-    container = document.createElement('div');
-    document.body.appendChild(container);
+//    container = document.createElement('div');
+//    document.body.appendChild(container);
 
-    var info = document.createElement('div');
-    info.style.position = 'absolute';
-    info.style.top = '10px';
-    info.style.width = '100%';
-    info.style.textAlign = 'center';
-    info.id = 'info';
-    info.innerHTML = 'Camera Velocity Test';
-    container.appendChild(info);
+    container = document.getElementById('world');
+    info = document.getElementById('info');
+//    btnPlay = document.getElementById('btnPlay');
+//    btnStop = document.getElementById('btnStop');
+//    btnPause = document.getElementById('btnPause');        
 
     camera = new THREE.PerspectiveCamera(camera_gui_params.fov, window.innerWidth / window.innerHeight, camera_gui_params.near, camera_gui_params.far);
     camera.position.y = camera_gui_params.position_y;
@@ -40,22 +41,12 @@ function init() {
 
     scene = new THREE.Scene();
 
-    var geometry = new THREE.SphereGeometry(100,20,20);
-    
-    var material = new THREE.MeshBasicMaterial({color: 0xff0000});
-    
-    body1 = new THREE.Mesh(geometry, material);
-    
-    body2 = new THREE.Mesh(geometry, material);
-    body2.position.z = -10000; /* 100 metros */
-    
-    scene.add(body1);
-    scene.add(body2);
-
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
 
     container.appendChild(renderer.domElement);
+
+    render();
 
     stats = new Stats();
     stats.domElement.style.position = 'absolute';
@@ -65,7 +56,97 @@ function init() {
     document.addEventListener('keydown', onKeyDown, false);
     document.addEventListener('keyup', onKeyUp, false);
 
+    btnPlay.addEventListener('click', btnPlayClick, false);
+    btnStop.addEventListener('click', btnStopClick, false);
+    btnPause.addEventListener('click', btnPauseClick, false);
+
+    btnAddBall.addEventListener('click', btnAddBallClick, false);
+
     window.addEventListener('resize', onWindowResize, false);
+
+}
+
+function btnPlayClick() {
+    animate();
+    worldStatus = "RUNNING";
+}
+
+function btnStopClick() {
+    cancelAnimationFrame(requestAnimationId);
+
+    // Reset world state
+    for (k in balls) {
+        balls[k].position.y = balls[k].position.y0;
+        balls[k].position.x = balls[k].position.x0;
+    }    
+
+    worldStatus = "STOPPED";
+    render();
+}
+
+function btnPauseClick() {
+    cancelAnimationFrame(requestAnimationId);
+    worldStatus = "PAUSED";
+}
+
+function btnAddBallClick() {
+    if (worldStatus != "STOPPED")
+        return;
+    var geometry = new THREE.SphereGeometry(10, 20, 20);
+
+    var material = new THREE.MeshBasicMaterial({color: 0xff0000});
+
+    var body = new THREE.Mesh(geometry, material);
+    body.position.y0 = 300;
+    body.position.x0 = Math.floor(Math.random() * 300)
+    body.position.y = body.position.y0;
+    body.position.x = body.position.x0;
+
+    balls.push(body);
+
+    scene.add(body);
+    render();
+}
+
+var time;
+var dt;
+var timeElapsed;
+var veloCamara; /* en metros/segundo */
+var repeat;
+var deltaCamera;
+var inicio;
+var startTimer = false;
+function animate() {
+
+    requestAnimationId = requestAnimationFrame(animate);
+
+    render();
+    stats.update();
+    var now = new Date().getTime();
+    dt = now - (time || now);
+    if (startTimer) {
+        timeElapsed = now - inicio;
+    }
+    time = now;
+
+    veloCamara = 1;
+    repeat = dt;
+    //deltaCamera = 10;
+    deltaCamera = veloCamara * repeat / 10;
+
+}
+
+function render() {
+    if (worldStatus != "STOPPED") {
+        btnAddBall.disabled = true;
+    }else{
+        btnAddBall.disabled = false;
+    }
+    for (k in balls) {
+        balls[k].position.y -= Math.random()*5;
+    }
+    // info.innerHTML = "requestAnimationId: " + requestAnimationId;
+    renderer.render(scene, camera);
 
 }
 
@@ -92,27 +173,52 @@ function init() {
  * 
  * velocamara = 1000 unidades/s
  * 
+ * La formula es esta: veloCamara = (deltaCamara/repeat)*10 metros/segundos
+ * 
  * Ahora se trata de fijar la correspondencia entre la unidad de longitud
  * en es espacio webGL y en el espacio simulado. Por ejemplo, si hacemos que
  * 1 unidad del espacio webGL sea igual a 1 cm, entonces:
  * velocamara = 1000 cm/s = 10 m/s
  * 
+ * Importante: Existe un límite para el valor de repeat. Este límite viene dado:
+ * 
+ * 1) por el propio motor de javascript; la especificación es 4 ms
+ * 
+ * 2) por la performance del webgl; si la animación se esta renderizando a un
+ *    ritmo de 30 fps, es decir que entre dos frames pasan 33 ms, no podemos 
+ *    poner un valor menor a 33ms. Bueno, si lo podemos poner, pero los cálculos
+ *    anteriores ya no son válidos, ya que parten del supuesto de que la camara
+ *    se mueve deltaCamera cada repeat ms, y esto deja de ser cierto para una
+ *    cantidad menor a 33ms.
+ *    
+ * El algoritmo para fijar la velocidad de la cámara es el siguiente:
+ * 
+ * En todo momento se mide el fps, o mejor dicho, su inversa, es decir el
+ * nº de milisegundos entre dos frames. Almacenamos en la variable repeat
+ * este intervalo. Entonces, teniendo en cuenta todo lo que hemos dicho antes, 
+ * adaptamos el deltaCamara para que la velocidad sea la fijada:
+ * 
+ * deltaCamera = veloCamara * repeat / 10; 
+ * 
+ * Esto sería en m/s teniendo en cuenta que hemos elegido un tamaño de 1cm para
+ * ls unidad de espacio de webgl.
  */
 
-var deltaCamera = 10;
+
+
 var timers = {};
 var keys = {
     37: function() {
         MoveCamera(-deltaCamera, 0, 0);
     },
     38: function() {
-        MoveCamera(0, -deltaCamera, 0);
+        MoveCamera(0, deltaCamera, 0);
     },
     39: function() {
         MoveCamera(deltaCamera, 0, 0);
     },
     40: function() {
-        MoveCamera(0, deltaCamera, 0);
+        MoveCamera(0, -deltaCamera, 0);
     },
     65: function() {
         MoveCamera(0, 0, -deltaCamera);
@@ -122,9 +228,6 @@ var keys = {
     }
 };
 
-var repeat = 10;
-
-var inicio, final, incremento;
 /**
  * Cuando presionamos una tecla, si dicha tecla esta registrada en el
  * array keys, entonces se asocia un timer a esa tecla de manera que
@@ -135,7 +238,13 @@ var inicio, final, incremento;
  * @returns {Boolean}
  */
 function onKeyDown(event) {
-    inicio = Date.now();
+
+
+    startTimer = true;
+    if (!inicio) {
+        inicio = new Date().getTime();
+    }
+
     var key = (event || window.event).keyCode;
     if (!(key in keys))
         return true;
@@ -157,11 +266,11 @@ function onKeyDown(event) {
  * @returns {undefined}
  */
 function onKeyUp(event) {
-    final = Date.now();
-    
-    incremento = final-inicio;
-        
-    console.log(incremento + " s elapsed");
+
+
+
+    startTimer = false;
+
     var key = (event || window.event).keyCode;
     if (key in timers) {
         if (timers[key] !== null)
@@ -186,24 +295,6 @@ function onWindowResize() {
     camera.updateProjectionMatrix();
 
     renderer.setSize(window.innerWidth, window.innerHeight);
-
-}
-
-
-function animate() {
-
-    requestAnimationFrame(animate);
-    
-    var info = document.getElementById('info');
-    info.innerHTML = 'Camera Velocity Test: ' + camera.position.x + ',' + camera.position.y + ',' +camera.position.z;
-    render();
-    stats.update();
-
-}
-
-function render() {
-
-    renderer.render(scene, camera);
 
 }
 

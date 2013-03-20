@@ -24,10 +24,31 @@
                 margin: 0px;
                 overflow: hidden;
             }
+            
+            .buttons{
+                float: right;
+            }
+            
+            .info {
+                position:fixed !important; 
+                right:200px; 
+                top:0px; 
+                z-index:10 !important} 
+            
            
         </style>
     </head>
-    <body>               
+    <body>  
+        
+        <div id="info"></div>
+        <div class="buttons" id="menu">
+            <button id="btnPlay">play</button>
+            <button id="btnPause">pause</button>
+            <button id="btnStop">stop</button>
+            <button id="btnAddBall">bolita</button>
+            
+        </div>
+        <div id="world"></div>
         <!--[if lt IE 7]>
             <p class="chromeframe">You are using an outdated browser. <a href="http://browsehappy.com/">Upgrade your browser today</a> or <a href="http://www.google.com/chromeframe/?redirect=true">install Google Chrome Frame</a> to better experience this site.</p>
         <![endif]-->
