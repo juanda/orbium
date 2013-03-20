@@ -4,9 +4,7 @@ var requestAnimationId;
 var balls = [];
 var worldStatus = "STOPPED";
 
-
 var camera, scene, renderer;
-
 
 var windowHalfX = window.innerWidth / 2;
 var windowHalfY = window.innerHeight / 2;
@@ -21,18 +19,14 @@ var camera_gui_params = {
 };
 
 init();
-//animate();
 
+//
+// init world
+//
 function init() {
 
-//    container = document.createElement('div');
-//    document.body.appendChild(container);
-
-    container = document.getElementById('world');
-    info = document.getElementById('info');
-//    btnPlay = document.getElementById('btnPlay');
-//    btnStop = document.getElementById('btnStop');
-//    btnPause = document.getElementById('btnPause');        
+    container = $('#world');
+    var info = $('#info');
 
     camera = new THREE.PerspectiveCamera(camera_gui_params.fov, window.innerWidth / window.innerHeight, camera_gui_params.near, camera_gui_params.far);
     camera.position.y = camera_gui_params.position_y;
@@ -44,69 +38,34 @@ function init() {
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
 
-    container.appendChild(renderer.domElement);
+    container.append(renderer.domElement);
 
     render();
 
     stats = new Stats();
     stats.domElement.style.position = 'absolute';
     stats.domElement.style.top = '0px';
-    container.appendChild(stats.domElement);
+    
+    info.append(stats.domElement);
 
     document.addEventListener('keydown', onKeyDown, false);
     document.addEventListener('keyup', onKeyUp, false);
-
-    btnPlay.addEventListener('click', btnPlayClick, false);
-    btnStop.addEventListener('click', btnStopClick, false);
-    btnPause.addEventListener('click', btnPauseClick, false);
-
-    btnAddBall.addEventListener('click', btnAddBallClick, false);
-
     window.addEventListener('resize', onWindowResize, false);
 
+    $('#btnPlay').click(btnPlayClick);
+    $('#btnStop').click(btnStopClick);
+    $('#btnPause').click(btnPauseClick);
+
+    $('#btnAddBall').click(btnAddBallClick);
+    
+    $('#btnBallParamsOK').click(btnBallParamsOKClick);
+    $('#btnBallParamsCancel').click(btnBallParamsCancel);
+
 }
 
-function btnPlayClick() {
-    animate();
-    worldStatus = "RUNNING";
-}
-
-function btnStopClick() {
-    cancelAnimationFrame(requestAnimationId);
-
-    // Reset world state
-    for (k in balls) {
-        balls[k].position.y = balls[k].position.y0;
-        balls[k].position.x = balls[k].position.x0;
-    }    
-
-    worldStatus = "STOPPED";
-    render();
-}
-
-function btnPauseClick() {
-    cancelAnimationFrame(requestAnimationId);
-    worldStatus = "PAUSED";
-}
-
-function btnAddBallClick() {
-    if (worldStatus != "STOPPED")
-        return;
-    var geometry = new THREE.SphereGeometry(10, 20, 20);
-
-    var material = new THREE.MeshBasicMaterial({color: 0xff0000});
-
-    var body = new THREE.Mesh(geometry, material);
-    body.position.y0 = 300;
-    body.position.x0 = Math.floor(Math.random() * 300)
-    body.position.y = body.position.y0;
-    body.position.x = body.position.x0;
-
-    balls.push(body);
-
-    scene.add(body);
-    render();
-}
+//
+// Animation
+//
 
 var time;
 var dt;
@@ -115,18 +74,16 @@ var veloCamara; /* en metros/segundo */
 var repeat;
 var deltaCamera;
 var inicio;
-var startTimer = false;
 function animate() {
 
     requestAnimationId = requestAnimationFrame(animate);
 
     render();
     stats.update();
+    
     var now = new Date().getTime();
     dt = now - (time || now);
-    if (startTimer) {
-        timeElapsed = now - inicio;
-    }
+    
     time = now;
 
     veloCamara = 1;
@@ -136,14 +93,18 @@ function animate() {
 
 }
 
+//
+// render
+//
+
 function render() {
     if (worldStatus != "STOPPED") {
         btnAddBall.disabled = true;
-    }else{
+    } else {
         btnAddBall.disabled = false;
     }
     for (k in balls) {
-        balls[k].position.y -= Math.random()*5;
+        balls[k].position.y -= Math.random() * 2;
     }
     // info.innerHTML = "requestAnimationId: " + requestAnimationId;
     renderer.render(scene, camera);
@@ -238,13 +199,7 @@ var keys = {
  * @returns {Boolean}
  */
 function onKeyDown(event) {
-
-
-    startTimer = true;
-    if (!inicio) {
-        inicio = new Date().getTime();
-    }
-
+   
     var key = (event || window.event).keyCode;
     if (!(key in keys))
         return true;
@@ -266,10 +221,6 @@ function onKeyDown(event) {
  * @returns {undefined}
  */
 function onKeyUp(event) {
-
-
-
-    startTimer = false;
 
     var key = (event || window.event).keyCode;
     if (key in timers) {
@@ -295,70 +246,82 @@ function onWindowResize() {
     camera.updateProjectionMatrix();
 
     renderer.setSize(window.innerWidth, window.innerHeight);
-
 }
 
-function addGUICameraControl(gui, camera, gui_params) {
-
-    var folder_camera = gui.addFolder('Camera');
-    var camera_fov_controller = folder_camera.add(gui_params, 'fov', 0, 360).step(1);
-    var camera_position_y_controller = folder_camera.add(gui_params, 'position_y', -500, 500).step(10);
-    var camera_position_z_controller = folder_camera.add(gui_params, 'position_z', -500, 500).step(10);
-    var camera_position_x_controller = folder_camera.add(gui_params, 'position_x', -500, 500).step(10);
-    var camera_near_controller = folder_camera.add(gui_params, 'near', 1, 3000).step(10);
-    var camera_far_controller = folder_camera.add(gui_params, 'far', 1, 3000).step(10);
-
-    camera_fov_controller.onChange(function(fov) {
-        camera.fov = fov;
-        camera.updateProjectionMatrix();
-    });
-
-    camera_position_y_controller.onChange(function(y) {
-        camera.position.y = y;
-        camera.updateProjectionMatrix();
-    });
-
-    camera_position_z_controller.onChange(function(z) {
-        camera.position.z = z;
-        camera.updateProjectionMatrix();
-    });
-
-    camera_position_x_controller.onChange(function(x) {
-        camera.position.x = x;
-        camera.updateProjectionMatrix();
-    });
-
-    camera_near_controller.onChange(function(near) {
-        camera.near = near;
-        camera.updateProjectionMatrix();
-    });
-
-    camera_far_controller.onChange(function(far) {
-        camera.far = far;
-        camera.updateProjectionMatrix();
-    });
+//
+// Buttons actions
+//
+function btnPlayClick() {
+    animate();
+    worldStatus = "RUNNING";
 }
 
-function addGUICubeControl(gui, cube, gui_params) {
+function btnStopClick() {
+    cancelAnimationFrame(requestAnimationId);
 
-    var folder_cube = gui.addFolder('Cube');
-    var cube_position_x_controller = folder_cube.add(gui_params, 'position_x', -500, 500).step(10);
-    var cube_position_y_controller = folder_cube.add(gui_params, 'position_y', -500, 500).step(10);
-    var cube_position_z_controller = folder_cube.add(gui_params, 'position_z', -500, 500).step(10);
+    // Reset world state
+    for (k in balls) {
+        balls[k].position.y = balls[k].position.y0;
+        balls[k].position.x = balls[k].position.x0;
+    }
 
-    cube_position_x_controller.onChange(function(x) {
-        cube.position.x = x;
-        //camera.updateProjectionMatrix();
-    });
-    cube_position_y_controller.onChange(function(y) {
-        cube.position.y = y;
-        //camera.updateProjectionMatrix();
-    });
-    cube_position_z_controller.onChange(function(z) {
-        cube.position.z = z;
-        //camera.updateProjectionMatrix();
-    });
+    worldStatus = "STOPPED";
+    render();
 }
+
+function btnPauseClick() {
+    cancelAnimationFrame(requestAnimationId);
+    worldStatus = "PAUSED";
+}
+
+function btnAddBallClick() {
+    if (worldStatus != "STOPPED")
+        return;
+
+    $('#windowBallParams').modal('show');
+}
+
+function btnBallParamsOKClick() {
+
+    var params = {
+        r: $('#inputRadious').val(),
+        x0: $('#inputX0').val(),
+        y0: $('#inputY0').val(),
+        z0: $('#inputZ0').val(),
+        vx0: $('#inputVX0').val(),
+        vy0: $('#inputVY0').val(),
+        vz0: $('#inputVZ0').val()
+    };
+
+    console.log(params);
+
+    $('#windowBallParams').modal('hide');
+
+
+    var geometry = new THREE.SphereGeometry(params.r, 20, 20);
+
+    var material = new THREE.MeshBasicMaterial({color: 0xff0000});
+
+    var body = new THREE.Mesh(geometry, material);
+    body.position.y0 = params.y0;
+    body.position.x0 = params.x0;
+    body.position.z0 = params.z0;
+    //body.velocity.x0 = params.vx0;
+    
+    body.position.y = body.position.y0;
+    body.position.x = body.position.x0;
+    body.position.z = body.position.z0;
+
+    balls.push(body);
+
+    scene.add(body);
+    render();
+}
+
+function btnBallParamsCancel() {
+    $('#windowBallParams').modal('hide');
+}
+
 
 function OB_ReferenceFrame(lon, color) {
 
